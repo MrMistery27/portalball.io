@@ -475,9 +475,115 @@ const Table = (() => {
   return { generate, getData, getBallSpawnPos, getGreenPortalPos };
 })();
 
-const Portals = { drawBlue() {}, reset() {}, onGreenHit() {}, onRedHit() {}, onBlueHit() {}, placeBlue() {} };
-const Collectibles = {};
-const Bumpers = {};
+const Bumpers = (() => {
+  const pulses = {};
+
+  function onHit(body) {
+    AudioEngine.play('bumper');
+    GameState.addScore(100);
+    GameState.bumpMultiplier();
+    pulses[body.id] = 8;
+    setTimeout(() => { delete pulses[body.id]; }, 200);
+  }
+
+  function getPulse(id) {
+    return pulses[id] || 0;
+  }
+
+  return { onHit, getPulse };
+})();
+
+const Collectibles = (() => {
+  function collectCoin(body) {
+    const world = Physics.getWorld();
+    Matter.World.remove(world, body);
+    const data = Table.getData();
+    data.coins = data.coins.filter(c => c.id !== body.id);
+    GameState.addCoins(1);
+    GameState.addScore(50);
+  }
+
+  function collectEmerald(body) {
+    const world = Physics.getWorld();
+    Matter.World.remove(world, body);
+    const data = Table.getData();
+    data.emeralds = data.emeralds.filter(e => e.id !== body.id);
+    GameState.addEmerald();
+    GameState.addScore(500);
+  }
+
+  return { collectCoin, collectEmerald };
+})();
+
+const Portals = (() => {
+  let bluePortal = null;
+  let blueSensor = null;
+  let teleporting = false;
+
+  function placeBlue(x, y, canvas) {
+    const world = Physics.getWorld();
+    if (blueSensor) Matter.World.remove(world, blueSensor);
+
+    bluePortal = { x, y };
+    blueSensor = Matter.Bodies.circle(x, y, 14, {
+      isStatic: true, isSensor: true, label: 'portal-blue-sensor'
+    });
+    Matter.World.add(world, blueSensor);
+    AudioEngine.play('portalBlue');
+  }
+
+  function drawBlue(ctx) {
+    if (!bluePortal) return;
+    const pulse = (Math.sin(Date.now() * 0.006) * 3 + 3);
+    ctx.beginPath();
+    ctx.arc(bluePortal.x, bluePortal.y, 14 + pulse, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.portalBlue + '33';
+    ctx.fill();
+    ctx.strokeStyle = COLORS.portalBlue;
+    ctx.lineWidth = 3;
+    ctx.shadowBlur = 20 + pulse * 2;
+    ctx.shadowColor = COLORS.portalBlue;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+
+  function onBlueHit() {
+    if (teleporting) return;
+    teleporting = true;
+    const data = Table.getData();
+    const exit = Table.getGreenPortalPos();
+    if (data.ball) {
+      const vel = { ...data.ball.velocity };
+      Matter.Body.setPosition(data.ball, { x: exit.x, y: exit.y });
+      Matter.Body.setVelocity(data.ball, vel);
+    }
+    AudioEngine.play('portalBlue');
+    setTimeout(() => { teleporting = false; }, 500);
+  }
+
+  function onGreenHit() {
+    // Green is exit — no action needed (ball just passes through)
+  }
+
+  function onRedHit() {
+    if (GameState.current !== STATES.PINBALL) return;
+    AudioEngine.play('portalRed');
+    const options = [STATES.MINIGAME_LABYRINTH, STATES.MINIGAME_GRAVITY, STATES.MINIGAME_MIRROR];
+    const chosen = options[Math.floor(Math.random() * options.length)];
+    setTimeout(() => transitionTo(chosen), 300);
+  }
+
+  function reset() {
+    bluePortal = null;
+    if (blueSensor) {
+      Matter.World.remove(Physics.getWorld(), blueSensor);
+      blueSensor = null;
+    }
+    teleporting = false;
+  }
+
+  return { placeBlue, drawBlue, onBlueHit, onGreenHit, onRedHit, reset };
+})();
 
 const Flippers = (() => {
   const { Bodies, World, Body, Constraint } = Matter;
