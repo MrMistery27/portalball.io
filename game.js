@@ -1372,9 +1372,19 @@ function drawPortalStatic(ctx, body) {
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 function startGame() {
+  // Wire buttons FIRST — before any code that could throw
+  function goPlay() { transitionTo(STATES.PINBALL); }
+  const btnPlay = document.getElementById('btn-play');
+  const btnRestart = document.getElementById('btn-restart');
+  btnPlay.addEventListener('click', goPlay);
+  btnPlay.addEventListener('touchend', e => { e.preventDefault(); goPlay(); });
+  btnRestart.addEventListener('click', goPlay);
+  btnRestart.addEventListener('touchend', e => { e.preventDefault(); goPlay(); });
+
   const canvas = document.getElementById('gameCanvas');
-  canvas.width = canvas.offsetWidth;
-  canvas.height = canvas.offsetHeight;
+  // Fallback dimensions in case layout hasn't resolved yet
+  canvas.width = canvas.offsetWidth || window.innerWidth;
+  canvas.height = canvas.offsetHeight || (window.innerHeight - 80);
 
   Physics.init(canvas);
   Renderer.init(canvas);
@@ -1392,13 +1402,10 @@ function startGame() {
   document.addEventListener('touchstart', initAudio);
   document.addEventListener('click', initAudio);
 
-  // Button wiring
-  document.getElementById('btn-play').addEventListener('click', () => transitionTo(STATES.PINBALL));
-  document.getElementById('btn-restart').addEventListener('click', () => transitionTo(STATES.PINBALL));
-
   transitionTo(STATES.LAUNCH);
   HUD.update();
 }
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', startGame);
+// Scripts are at end of <body> — DOM is already parsed, call directly.
+startGame();
