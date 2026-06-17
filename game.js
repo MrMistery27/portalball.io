@@ -406,9 +406,10 @@ const Table = (() => {
   }
 
   function spawnBall(world, W, H) {
-    const ball = Bodies.circle(W - 45, H * 0.75, 12, {
+    const ball = Bodies.circle(W - 45, H * 0.82, 12, {
       restitution: 0.6, friction: 0.05, frictionAir: 0.008,
-      density: 0.004, label: 'ball', sleepAllowed: false
+      density: 0.004, label: 'ball', sleepAllowed: false,
+      isStatic: true  // held in plunger lane until launched
     });
     World.add(world, ball);
     tableData.ball = ball;
@@ -474,6 +475,7 @@ const Table = (() => {
         GameState.loseLife();
         Controls.resetLaunch();
         if (GameState.lives > 0) {
+          Matter.Body.setStatic(data.ball, true);
           Matter.Body.setPosition(data.ball, getBallSpawnPos());
           Matter.Body.setVelocity(data.ball, { x: 0, y: 0 });
         }
@@ -1206,6 +1208,7 @@ const Controls = (() => {
     launched = true;
     const data = Table.getData();
     if (data.ball) {
+      Matter.Body.setStatic(data.ball, false);
       Matter.Body.setVelocity(data.ball, { x: 0, y: -18 });
       AudioEngine.play('launch');
     }
