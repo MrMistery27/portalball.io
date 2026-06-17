@@ -185,12 +185,12 @@ const HUD = {
 };
 
 // ─── State transition ─────────────────────────────────────────────────────────
-function transitionTo(state, payload = {}) {
+function transitionTo(state) {
   const prev = GameState.current;
   GameState.current = state;
 
   // Teardown previous state
-  if (prev === STATES.PINBALL) Physics.pause();
+  if (prev === STATES.PINBALL || prev === STATES.MINIGAME_LABYRINTH || prev === STATES.MINIGAME_GRAVITY || prev === STATES.MINIGAME_MIRROR) Physics.pause();
 
   // Setup new state
   switch (state) {
@@ -203,7 +203,7 @@ function transitionTo(state, payload = {}) {
     case STATES.PINBALL:
       hideOverlay();
       Minigames.stop();
-      GameState.reset();
+      if (prev === STATES.LAUNCH || prev === STATES.GAME_OVER) GameState.reset();
       HUD.update();
       Table.generate();
       Physics.resume();
@@ -458,6 +458,7 @@ const Table = (() => {
 
     // Drain detection: ball falls below canvas
     Matter.Events.on(engine, 'afterUpdate', () => {
+      if (GameState.current !== STATES.PINBALL) return;
       const data = getData();
       if (!data.ball) return;
       const canvas = document.getElementById('gameCanvas');
@@ -521,7 +522,7 @@ const Portals = (() => {
   let blueSensor = null;
   let teleporting = false;
 
-  function placeBlue(x, y, canvas) {
+  function placeBlue(x, y) {
     const world = Physics.getWorld();
     if (blueSensor) Matter.World.remove(world, blueSensor);
 
@@ -677,6 +678,7 @@ const Minigames = (() => {
     }
 
     function start() {
+      won = false;
       maze = generateMaze(COLS, ROWS);
       playerPos = { r: 0, c: 0 };
       startTime = Date.now();
@@ -701,8 +703,13 @@ const Minigames = (() => {
       }
     }
 
-    function onSwipe(e) {
-      if (!swipeStart) { swipeStart = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }; return; }
+    function onSwipeStart(e) {
+      if (!e.changedTouches) return;
+      swipeStart = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+    }
+
+    function onSwipeEnd(e) {
+      if (!swipeStart || !e.changedTouches) return;
       const dx = e.changedTouches[0].clientX - swipeStart.x;
       const dy = e.changedTouches[0].clientY - swipeStart.y;
       swipeStart = null;
@@ -716,8 +723,12 @@ const Minigames = (() => {
       }
     }
 
+    let won = false;
+
     function checkWin() {
+      if (won) return;
       if (playerPos.r === ROWS - 1 && playerPos.c === COLS - 1) {
+        won = true;
         document.removeEventListener('keydown', onKey);
         GameState.addCoins(3);
         GameState.addScore(500);
@@ -779,7 +790,7 @@ const Minigames = (() => {
 
     function stop() { document.removeEventListener('keydown', onKey); }
 
-    return { start, draw, onSwipe, stop };
+    return { start, draw, onSwipeStart, onSwipeEnd, stop };
   })();
 
   // ── Gravity-Flip ──────────────────────────────────────────────────────────
@@ -902,7 +913,13 @@ const Minigames = (() => {
       ctx.fillRect(0, H - 6, W * (1 - elapsed / 20), 6);
     }
 
-    return { start, draw, onTap };
+    function stop() {
+      ballY = 0.5;
+      gravDir = 1;
+      passed = 0;
+    }
+
+    return { start, draw, onTap, stop };
   })();
 
   // ── Mirror-Mode ────────────────────────────────────────────────────────────
@@ -1062,12 +1079,17 @@ const Minigames = (() => {
     if (active === STATES.MINIGAME_GRAVITY) Gravity.onTap();
   }
 
-  function onSwipe(e) {
-    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.onSwipe(e);
+  function onSwipeStart(e) {
+    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.onSwipeStart(e);
+  }
+
+  function onSwipeEnd(e) {
+    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.onSwipeEnd(e);
   }
 
   function stop() {
     if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.stop();
+    if (active === STATES.MINIGAME_GRAVITY) Gravity.stop();
     if (active === STATES.MINIGAME_MIRROR) Mirror.stop();
     active = null;
   }
@@ -1082,7 +1104,7 @@ const Minigames = (() => {
     if (active === STATES.MINIGAME_MIRROR) Mirror.onTouchRelease();
   }
 
-  return { start, draw, onTap, onSwipe, stop, onTouchLeft, onTouchRight, onTouchRelease };
+  return { start, draw, onTap, onSwipeStart, onSwipeEnd, stop, onTouchLeft, onTouchRight, onTouchRelease };
 })();
 
 const Controls = (() => {
@@ -1109,8 +1131,10 @@ const Controls = (() => {
 
     btnL.addEventListener('touchstart', e => { e.preventDefault(); if (GameState.current === STATES.PINBALL) Flippers.activateLeft(); }, { passive: false });
     btnL.addEventListener('touchend', e => { e.preventDefault(); Flippers.releaseLeft(); }, { passive: false });
+    btnL.addEventListener('touchcancel', e => { e.preventDefault(); Flippers.releaseLeft(); }, { passive: false });
     btnR.addEventListener('touchstart', e => { e.preventDefault(); if (GameState.current === STATES.PINBALL) Flippers.activateRight(); }, { passive: false });
     btnR.addEventListener('touchend', e => { e.preventDefault(); Flippers.releaseRight(); }, { passive: false });
+    btnR.addEventListener('touchcancel', e => { e.preventDefault(); Flippers.releaseRight(); }, { passive: false });
     btnLaunch.addEventListener('touchstart', e => { e.preventDefault(); if (GameState.current === STATES.PINBALL && !launched) launchBall(); }, { passive: false });
     btnLaunch.addEventListener('click', () => { if (GameState.current === STATES.PINBALL && !launched) launchBall(); });
 
@@ -1124,7 +1148,7 @@ const Controls = (() => {
 
       if (GameState.current === STATES.PINBALL) {
         if (y < portalZoneEnd) {
-          Portals.placeBlue(x, y, canvas);
+          Portals.placeBlue(x, y);
         } else {
           if (x < canvas.width / 2) Flippers.activateLeft();
           else Flippers.activateRight();
@@ -1132,7 +1156,7 @@ const Controls = (() => {
       } else if (GameState.current === STATES.MINIGAME_GRAVITY) {
         Minigames.onTap();
       } else if (GameState.current === STATES.MINIGAME_LABYRINTH) {
-        Minigames.onSwipe(e);
+        Minigames.onSwipeStart(e);
       } else if (GameState.current === STATES.MINIGAME_MIRROR) {
         if (x < canvas.width / 2) Minigames.onTouchLeft();
         else Minigames.onTouchRight();
@@ -1146,10 +1170,18 @@ const Controls = (() => {
       const y = touch.clientY - rect.top;
       if (GameState.current === STATES.MINIGAME_MIRROR) {
         Minigames.onTouchRelease();
+      } else if (GameState.current === STATES.MINIGAME_LABYRINTH) {
+        Minigames.onSwipeEnd(e);
       } else if (GameState.current === STATES.PINBALL && y >= canvas.height * 0.7) {
         if (x < canvas.width / 2) Flippers.releaseLeft();
         else Flippers.releaseRight();
       }
+    }, { passive: true });
+
+    canvas.addEventListener('touchcancel', () => {
+      Flippers.releaseLeft();
+      Flippers.releaseRight();
+      if (GameState.current === STATES.MINIGAME_MIRROR) Minigames.onTouchRelease();
     }, { passive: true });
 
     // Left-click: portal placement on desktop
@@ -1158,7 +1190,7 @@ const Controls = (() => {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
-      if (y < canvas.height * 0.7) Portals.placeBlue(x, y, canvas);
+      if (y < canvas.height * 0.7) Portals.placeBlue(x, y);
     });
   }
 
