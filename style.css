@@ -1,0 +1,163 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0a0a0f;
+  color: #00ffff;
+  font-family: 'Orbitron', monospace;
+  overflow: hidden;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Animated grid background */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0,255,255,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,255,0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  animation: gridScroll 8s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes gridScroll {
+  0% { background-position: 0 0; }
+  100% { background-position: 40px 40px; }
+}
+
+#game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  z-index: 1;
+}
+
+#gameCanvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+#hud {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0,0,0,0.7);
+  border-bottom: 1px solid rgba(0,255,255,0.2);
+  font-size: clamp(10px, 2.5vw, 14px);
+  font-weight: 700;
+  z-index: 10;
+  pointer-events: none;
+}
+
+#hud-mult { color: #ff00ff; }
+#hud-lives { color: #ff6600; letter-spacing: 2px; }
+#hud-coins { color: #ffdd00; }
+#hud-emeralds { color: #00ff88; }
+
+#overlay {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(10,10,15,0.92);
+  z-index: 20;
+  align-items: center;
+  justify-content: center;
+}
+
+#overlay.active { display: flex; }
+
+.screen { display: none; flex-direction: column; align-items: center; gap: 20px; text-align: center; padding: 24px; }
+.screen.active { display: flex; }
+
+.title { font-size: clamp(32px, 8vw, 56px); font-weight: 900; letter-spacing: 4px; text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff; }
+.accent { color: #ff00ff; text-shadow: 0 0 20px #ff00ff, 0 0 40px #ff00ff; }
+
+.btn-primary {
+  background: transparent;
+  border: 2px solid #00ffff;
+  color: #00ffff;
+  font-family: 'Orbitron', monospace;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 14px 40px;
+  cursor: pointer;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  transition: all 0.2s;
+  box-shadow: 0 0 10px rgba(0,255,255,0.3);
+}
+
+.btn-primary:hover, .btn-primary:active {
+  background: rgba(0,255,255,0.15);
+  box-shadow: 0 0 20px rgba(0,255,255,0.6);
+}
+
+#touch-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.flipper-btn, .launch-btn {
+  pointer-events: all;
+  background: rgba(0,255,255,0.1);
+  border: 2px solid rgba(0,255,255,0.4);
+  color: #00ffff;
+  font-size: 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.flipper-btn { width: 70px; height: 60px; }
+.launch-btn { width: 60px; height: 50px; }
+
+.flipper-btn:active, .launch-btn:active {
+  background: rgba(0,255,255,0.35);
+}
+
+/* Mini-game flash overlay */
+#screen-minigame-flash { color: #ff00ff; }
+#screen-minigame-flash h2 {
+  font-size: 36px;
+  text-shadow: 0 0 30px #ff00ff;
+  animation: flashIn 0.5s ease-out;
+}
+
+@keyframes flashIn {
+  0% { opacity: 0; transform: scale(1.5); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* HUD multiplier blink */
+@keyframes multBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.2; }
+}
+.mult-blink { animation: multBlink 0.3s ease 3; }

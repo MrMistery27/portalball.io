@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>PortalBall.io</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="hud">
+      <span id="hud-score">SCORE: 0</span>
+      <span id="hud-mult">×1</span>
+      <span id="hud-lives">♥♥♥</span>
+      <span id="hud-coins">🪙 0</span>
+      <span id="hud-emeralds">💎 0</span>
+    </div>
+
+    <div id="overlay" class="active">
+      <div id="screen-launch" class="screen active">
+        <h1 class="title">PORTAL<span class="accent">BALL</span>.io</h1>
+        <p id="highscore-display">HIGHSCORE: 0</p>
+        <div id="ball-preview"></div>
+        <button id="btn-play" class="btn-primary">PLAY</button>
+      </div>
+      <div id="screen-gameover" class="screen">
+        <h2>GAME OVER</h2>
+        <p id="final-score"></p>
+        <p id="session-coins"></p>
+        <p id="session-emeralds"></p>
+        <button id="btn-restart" class="btn-primary">RESTART</button>
+      </div>
+      <div id="screen-minigame-flash" class="screen">
+        <h2 id="minigame-title"></h2>
+      </div>
+    </div>
+
+    <div id="touch-controls">
+      <button id="btn-left-flipper" class="flipper-btn left">◀</button>
+      <button id="btn-launch" class="launch-btn">▲</button>
+      <button id="btn-right-flipper" class="flipper-btn right">▶</button>
+    </div>
+  </div>
+
+  <script>
+    window._matterLoaded = false;
+    function _onMatterLoad() { window._matterLoaded = true; }
+    var s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js';
+    s.onload = _onMatterLoad;
+    s.onerror = function() {
+      var f = document.createElement('script');
+      f.src = 'matter.min.js';
+      f.onload = _onMatterLoad;
+      document.head.appendChild(f);
+    };
+    document.head.appendChild(s);
+  </script>
+  <script src="game.js" defer></script>
+</body>
+</html>
