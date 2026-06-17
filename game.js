@@ -254,9 +254,10 @@ function showMinigameFlash(state, cb) {
 // ─── Placeholder namespaces (filled in later tasks) ───────────────────────────
 const Physics = (() => {
   let engine, world, runner, rafId;
-  const { Engine, World, Bodies, Body, Events, Runner } = Matter;
+  let Engine, World, Bodies, Body, Events, Runner;
 
   function init(canvas) {
+    ({ Engine, World, Bodies, Body, Events, Runner } = Matter);
     engine = Engine.create({ gravity: { y: 2 } });
     world = engine.world;
     runner = Runner.create();
@@ -280,7 +281,7 @@ const Physics = (() => {
 })();
 
 const Table = (() => {
-  const { Bodies, World, Body, Events, Constraint } = Matter;
+  let Bodies, World, Body, Events, Constraint;
   let tableData = {};
 
   function seededRand(seed) {
@@ -292,6 +293,7 @@ const Table = (() => {
   }
 
   function generate() {
+    if (!Bodies) ({ Bodies, World, Body, Events, Constraint } = Matter);
     const world = Physics.getWorld();
     World.clear(world);
     Physics.getEngine().gravity.y = 2;
@@ -399,7 +401,6 @@ const Table = (() => {
   }
 
   function spawnBall(world, W, H) {
-    const { Bodies, World } = Matter;
     const ball = Bodies.circle(W - 45, H * 0.75, 12, {
       restitution: 0.7, friction: 0.05, density: 0.002, label: 'ball'
     });
@@ -588,10 +589,11 @@ const Portals = (() => {
 })();
 
 const Flippers = (() => {
-  const { Bodies, World, Body, Constraint } = Matter;
+  let Bodies, World, Body, Constraint;
   let leftFlipper, rightFlipper, leftConstraint, rightConstraint;
 
   function init(world, W, H) {
+    if (!Bodies) ({ Bodies, World, Body, Constraint } = Matter);
     const fy = H - 90;
     const flW = W * 0.22, flH = 14;
 
