@@ -251,21 +251,211 @@ function showMinigameFlash(state, cb) {
 }
 
 // ─── Placeholder namespaces (filled in later tasks) ───────────────────────────
-const Physics = { pause() {}, resume() {} };
+const Physics = (() => {
+  let engine, world, runner, rafId;
+  const { Engine, World, Bodies, Body, Events, Runner } = Matter;
+
+  function init(canvas) {
+    engine = Engine.create({ gravity: { y: 2 } });
+    world = engine.world;
+    runner = Runner.create();
+    Runner.run(runner, engine);
+    return { engine, world };
+  }
+
+  function pause() {
+    if (runner) Runner.stop(runner);
+    if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
+  }
+
+  function resume() {
+    if (runner) Runner.run(runner, engine);
+  }
+
+  function getEngine() { return engine; }
+  function getWorld() { return world; }
+
+  return { init, pause, resume, getEngine, getWorld };
+})();
+
 const Table = { generate() {} };
-const Portals = {};
+const Portals = { drawBlue() {} };
 const Collectibles = {};
 const Bumpers = {};
 const Flippers = {};
-const Minigames = { start() {} };
+const Minigames = { start() {}, draw() {} };
 const Controls = { init() {} };
-const Renderer = {};
+
+const Renderer = (() => {
+  let ctx, canvas, rafId, running = false;
+
+  function init(cnv) {
+    canvas = cnv;
+    ctx = canvas.getContext('2d');
+  }
+
+  function start() {
+    running = true;
+    loop();
+  }
+
+  function stop() {
+    running = false;
+    if (rafId) cancelAnimationFrame(rafId);
+  }
+
+  function loop() {
+    if (!running) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = COLORS.bg;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    if (GameState.current === STATES.PINBALL) {
+      drawPinball(ctx, canvas);
+    } else if ([STATES.MINIGAME_LABYRINTH, STATES.MINIGAME_GRAVITY, STATES.MINIGAME_MIRROR].includes(GameState.current)) {
+      Minigames.draw(ctx, canvas);
+    }
+
+    rafId = requestAnimationFrame(loop);
+  }
+
+  return { init, start, stop };
+})();
+
+function drawPinball(ctx, canvas) {
+  const world = Physics.getWorld();
+  if (!world) return;
+
+  ctx.save();
+  // Draw static bodies (walls, bumpers, ramps)
+  world.bodies.forEach(body => {
+    if (body.label === 'wall' || body.label === 'ramp' || body.label === 'slingshot') {
+      drawBody(ctx, body, COLORS.cyan, 'rgba(0,255,255,0.08)', 1.5);
+    } else if (body.label === 'bumper') {
+      drawBumperBody(ctx, body);
+    } else if (body.label === 'ball') {
+      drawBallBody(ctx, body);
+    } else if (body.label === 'flipper-left' || body.label === 'flipper-right') {
+      drawBody(ctx, body, COLORS.magenta, 'rgba(255,0,255,0.2)', 2);
+    } else if (body.label === 'coin') {
+      drawCoin(ctx, body);
+    } else if (body.label === 'emerald') {
+      drawEmerald(ctx, body);
+    } else if (body.label === 'portal-green' || body.label === 'portal-red') {
+      drawPortalStatic(ctx, body);
+    }
+  });
+
+  Portals.drawBlue(ctx);
+  ctx.restore();
+}
+
+function drawBody(ctx, body, stroke, fill, lineWidth) {
+  const verts = body.vertices;
+  ctx.beginPath();
+  ctx.moveTo(verts[0].x, verts[0].y);
+  for (let i = 1; i < verts.length; i++) ctx.lineTo(verts[i].x, verts[i].y);
+  ctx.closePath();
+  ctx.fillStyle = fill || 'transparent';
+  ctx.fill();
+  ctx.strokeStyle = stroke;
+  ctx.lineWidth = lineWidth || 1;
+  ctx.shadowBlur = 8;
+  ctx.shadowColor = stroke;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
+
+function drawBumperBody(ctx, body) {
+  const pos = body.position;
+  const r = body.circleRadius;
+  const pulse = (Bumpers.getPulse && Bumpers.getPulse(body.id)) || 0;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, r + pulse, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(255,0,255,0.1)';
+  ctx.fill();
+  ctx.strokeStyle = COLORS.magenta;
+  ctx.lineWidth = 2;
+  ctx.shadowBlur = 15 + pulse * 3;
+  ctx.shadowColor = COLORS.magenta;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  // Inner dot
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, 4, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.magenta;
+  ctx.fill();
+}
+
+function drawBallBody(ctx, body) {
+  const pos = body.position;
+  const r = body.circleRadius;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.cyan;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = COLORS.cyan;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawCoin(ctx, body) {
+  const pos = body.position;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, 8, 0, Math.PI * 2);
+  ctx.fillStyle = COLORS.coin;
+  ctx.shadowBlur = 12;
+  ctx.shadowColor = COLORS.coin;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
+
+function drawEmerald(ctx, body) {
+  const pos = body.position;
+  const angle = (Date.now() * 0.002) % (Math.PI * 2);
+  ctx.save();
+  ctx.translate(pos.x, pos.y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(0, -10);
+  ctx.lineTo(8, 0);
+  ctx.lineTo(0, 10);
+  ctx.lineTo(-8, 0);
+  ctx.closePath();
+  ctx.fillStyle = COLORS.emerald;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = COLORS.emerald;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.restore();
+}
+
+function drawPortalStatic(ctx, body) {
+  const pos = body.position;
+  const color = body.label === 'portal-green' ? COLORS.portalGreen : COLORS.portalRed;
+  const r = body.circleRadius || 14;
+  ctx.beginPath();
+  ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color + '33';
+  ctx.fill();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 3;
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = color;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+}
 
 // ─── Entry point ──────────────────────────────────────────────────────────────
 function startGame() {
   const canvas = document.getElementById('gameCanvas');
   canvas.width = canvas.offsetWidth;
   canvas.height = canvas.offsetHeight;
+
+  Physics.init(canvas);
+  Renderer.init(canvas);
+  Renderer.start();
+  Controls.init(canvas);
 
   // Init audio on first interaction
   const initAudio = () => {
