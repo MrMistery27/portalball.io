@@ -456,14 +456,14 @@ const Table = (() => {
     });
 
     // Drain detection: ball falls below canvas
-    const engine2 = Physics.getEngine();
-    Matter.Events.on(engine2, 'afterUpdate', () => {
+    Matter.Events.on(engine, 'afterUpdate', () => {
       const data = getData();
       if (!data.ball) return;
       const canvas = document.getElementById('gameCanvas');
       if (data.ball.position.y > canvas.height + 50) {
         GameState.resetMultiplier();
         GameState.loseLife();
+        Controls.resetLaunch();
         if (GameState.lives > 0) {
           Matter.Body.setPosition(data.ball, getBallSpawnPos());
           Matter.Body.setVelocity(data.ball, { x: 0, y: 0 });
@@ -562,7 +562,7 @@ const Controls = (() => {
     btnLaunch.addEventListener('touchstart', e => { e.preventDefault(); if (GameState.current === STATES.PINBALL && !launched) launchBall(); }, { passive: false });
     btnLaunch.addEventListener('click', () => { if (GameState.current === STATES.PINBALL && !launched) launchBall(); });
 
-    // Touch: tap-half-screen flipper (upper 30% = portal zone, lower 70% = flipper zone)
+    // Touch: tap-half-screen flipper (upper 70% = portal zone, lower 30% = flipper zone)
     canvas.addEventListener('touchstart', e => {
       const touch = e.changedTouches[0];
       const rect = canvas.getBoundingClientRect();
