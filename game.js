@@ -1037,7 +1037,11 @@ const Minigames = (() => {
       leftDown = false; rightDown = false;
     }
 
-    return { start, draw, stop };
+    function onTouchLeft() { rightDown = true; }   // mirrored: left tap = right flipper
+    function onTouchRight() { leftDown = true; }   // mirrored: right tap = left flipper
+    function onTouchRelease() { leftDown = false; rightDown = false; }
+
+    return { start, draw, stop, onTouchLeft, onTouchRight, onTouchRelease };
   })();
 
   // ── Public API ────────────────────────────────────────────────────────────
