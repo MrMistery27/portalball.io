@@ -733,6 +733,7 @@ const Minigames = (() => {
     }
 
     function draw(ctx, canvas) {
+      if (GameState.current !== STATES.MINIGAME_LABYRINTH) return;
       checkTimeout();
       const W = canvas.width, H = canvas.height - 80;
       const cellW = W / COLS, cellH = H / ROWS;
@@ -808,6 +809,7 @@ const Minigames = (() => {
     function onTap() { flip(); }
 
     function draw(ctx, canvas) {
+      if (GameState.current !== STATES.MINIGAME_GRAVITY) return;
       const W = canvas.width, H = canvas.height;
       const elapsed = (Date.now() - startTime) / 1000;
 
@@ -933,6 +935,7 @@ const Minigames = (() => {
     }
 
     function draw(ctx, canvas) {
+      if (GameState.current !== STATES.MINIGAME_MIRROR) return;
       const W = canvas.width, H = canvas.height;
       const elapsed = (Date.now() - startTime) / 1000;
 
@@ -1065,7 +1068,17 @@ const Minigames = (() => {
     active = null;
   }
 
-  return { start, draw, onTap, onSwipe, stop };
+  function onTouchLeft() {
+    if (active === STATES.MINIGAME_MIRROR) Mirror.onTouchLeft();
+  }
+  function onTouchRight() {
+    if (active === STATES.MINIGAME_MIRROR) Mirror.onTouchRight();
+  }
+  function onTouchRelease() {
+    if (active === STATES.MINIGAME_MIRROR) Mirror.onTouchRelease();
+  }
+
+  return { start, draw, onTap, onSwipe, stop, onTouchLeft, onTouchRight, onTouchRelease };
 })();
 
 const Controls = (() => {
@@ -1116,6 +1129,9 @@ const Controls = (() => {
         Minigames.onTap();
       } else if (GameState.current === STATES.MINIGAME_LABYRINTH) {
         Minigames.onSwipe(e);
+      } else if (GameState.current === STATES.MINIGAME_MIRROR) {
+        if (x < canvas.width / 2) Minigames.onTouchLeft();
+        else Minigames.onTouchRight();
       }
     }, { passive: true });
 
@@ -1124,7 +1140,9 @@ const Controls = (() => {
       const rect = canvas.getBoundingClientRect();
       const x = touch.clientX - rect.left;
       const y = touch.clientY - rect.top;
-      if (GameState.current === STATES.PINBALL && y >= canvas.height * 0.7) {
+      if (GameState.current === STATES.MINIGAME_MIRROR) {
+        Minigames.onTouchRelease();
+      } else if (GameState.current === STATES.PINBALL && y >= canvas.height * 0.7) {
         if (x < canvas.width / 2) Flippers.releaseLeft();
         else Flippers.releaseRight();
       }
