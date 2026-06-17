@@ -237,6 +237,37 @@ Sichtbare Buttons + Touch-Hälfte sind gleichzeitig aktiv (kombinierter Ansatz).
 
 ---
 
+## Sound Design (Web Audio API)
+
+Alle Sounds synthetisch — kein externes Audio-File. Ein `AudioContext` wird beim ersten User-Interaction initialisiert (Browser-Policy).
+
+| Event | Typ | Parameter |
+|-------|-----|-----------|
+| Bumper-Hit | OscillatorNode (square) | Freq: 220 Hz → 110 Hz, Dauer: ~50ms, Gain: 0.8 → 0 |
+| Portal-Warp blau | OscillatorNode (sine) | Freq-Sweep: 300 Hz → 1200 Hz, Dauer: ~300ms |
+| Portal-Rot Trigger | OscillatorNode (sawtooth) | Freq: 80 Hz → 40 Hz, Dauer: ~200ms, Gain: 0.6 |
+| Flipper-Hit | OscillatorNode (square) | Freq: 440 Hz → 220 Hz, Dauer: ~60ms |
+| Ball-Launch | OscillatorNode (sine) | Freq-Sweep: 200 Hz → 600 Hz, Dauer: ~400ms |
+| Leben-Verlust | OscillatorNode (sawtooth) | Freq-Sweep: 400 Hz → 50 Hz, Dauer: ~800ms, Vibrato |
+| Münze | OscillatorNode (sine) | Freq: 1000 Hz → 1400 Hz, Dauer: ~120ms, Gain: 0.4 |
+| Smaragd | 4× OscillatorNode (sine) | Freqs: 800, 1000, 1200, 1600 Hz, je ~80ms versetzt, Arpeggio |
+| Mini-Game Start | 3× OscillatorNode (triangle) | Freqs: 523, 659, 784 Hz (C-E-G), je 100ms, kurzer Jingle |
+
+**Implementierung als `AudioEngine` Namespace:**
+```js
+const AudioEngine = {
+  ctx: null,
+  init() { this.ctx = new AudioContext() },
+  play(soundName) { ... }
+}
+```
+
+- `AudioEngine.init()` beim ersten `touchstart` oder `keydown` aufrufen
+- Alle Sounds als Methoden: `AudioEngine.play('bumper')`, `AudioEngine.play('coin')` etc.
+- `GainNode` für Lautstärke-Kontrolle, `BiquadFilterNode` für Klangformung wo nötig
+
+---
+
 ## Deployment
 
 ### GitHub Pages (automatisch)
@@ -259,6 +290,5 @@ Sichtbare Buttons + Touch-Hälfte sind gleichzeitig aktiv (kombinierter Ansatz).
 
 - Ball-Skin Shop (Münzen/Smaragde ausgeben)
 - Zusätzliche Mini-Game-Typen
-- Sound-Effekte (Web Audio API)
 - Level-Progression statt endlosem Einzeltisch
 - Capacitor-Build Pipeline
