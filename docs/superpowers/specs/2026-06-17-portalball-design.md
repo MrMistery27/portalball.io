@@ -35,8 +35,8 @@ Zentrale `GameState`-State-Machine in `game.js`. Alle State-Wechsel laufen über
 LAUNCH → PINBALL ⇄ MINIGAME_LABYRINTH
                  ⇄ MINIGAME_GRAVITY
                  ⇄ MINIGAME_MIRROR
-         ↓
-       GAME_OVER
+                 ↓
+              GAME_OVER → LAUNCH
 ```
 
 - **LAUNCH:** Startscreen mit Highscore, Play-Button, Ball-Skin-Vorschau
@@ -134,7 +134,8 @@ Seed: `Date.now()` beim Spielstart — eindeutiger Tisch pro Runde.
 - Verwendung: Ball-Skins (späterer Shop)
 
 **Smaragde (💎 cyan, selten):**
-- Wert: 10 Münzen (direkt konvertiert) oder als `localStorage.emeralds` getrennt gespeichert
+- Wert: separat gespeichert in `pb_emeralds` (nicht zu Münzen konvertiert)
+- Im späteren Shop: 1 Smaragd entspricht 10 Münzen Kaufkraft für Premium-Skins
 - Visuell: rotierender Glitzereffekt (Canvas `shadowBlur` + Rotation)
 
 ---
@@ -187,7 +188,7 @@ Seed: `Date.now()` beim Spielstart — eindeutiger Tisch pro Runde.
 | Tap linke Hälfte | Linker Flipper |
 | Tap rechte Hälfte | Rechter Flipper |
 | Launch-Button (Mitte unten) | Ball launchen |
-| Tap auf Spielfeld | Blaues Portal platzieren |
+| Tap auf Spielfeld (obere 70% des Canvas) | Blaues Portal platzieren |
 | Swipe | Labyrinth-Navigation |
 | Tap Mitte | Gravity-Flip |
 
