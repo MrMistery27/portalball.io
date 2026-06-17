@@ -45,22 +45,7 @@
     </div>
   </div>
 
-  <script>
-    window._matterLoaded = false;
-    function _onMatterLoad() { window._matterLoaded = true; }
-    var s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js';
-    s.integrity = 'sha384-OqQP3UcU7efkEYDRjGmQou2uEvzGFGRtwdYXTjnupeB9cWogSgQ4BOhyklFBYbBR';
-    s.crossOrigin = 'anonymous';
-    s.onload = _onMatterLoad;
-    s.onerror = function() {
-      var f = document.createElement('script');
-      f.src = 'matter.min.js';
-      f.onload = _onMatterLoad;
-      document.head.appendChild(f);
-    };
-    document.head.appendChild(s);
-  </script>
+  <script src="matter.min.js"></script>
   <script src="game.js" defer></script>
 </body>
 </html>

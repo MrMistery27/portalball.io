@@ -1401,13 +1401,4 @@ function startGame() {
 }
 
 // ─── Bootstrap ───────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  function tryStart() {
-    if (window._matterLoaded && typeof Matter !== 'undefined') {
-      startGame();
-    } else {
-      setTimeout(tryStart, 50);
-    }
-  }
-  tryStart();
-});
+document.addEventListener('DOMContentLoaded', startGame);
