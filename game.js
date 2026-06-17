@@ -258,9 +258,14 @@ const Physics = (() => {
 
   function init(canvas) {
     ({ Engine, World, Bodies, Body, Events, Runner } = Matter);
-    engine = Engine.create({ gravity: { y: 2 } });
+    engine = Engine.create({
+      gravity: { y: 1 },
+      positionIterations: 10,
+      velocityIterations: 8,
+      constraintIterations: 4
+    });
     world = engine.world;
-    runner = Runner.create();
+    runner = Runner.create({ delta: 1000 / 60, isFixed: true });
     Runner.run(runner, engine);
     return { engine, world };
   }
@@ -296,7 +301,7 @@ const Table = (() => {
     if (!Bodies) ({ Bodies, World, Body, Events, Constraint } = Matter);
     const world = Physics.getWorld();
     World.clear(world);
-    Physics.getEngine().gravity.y = 2;
+    Physics.getEngine().gravity.y = 1;
 
     const canvas = document.getElementById('gameCanvas');
     const W = canvas.width, H = canvas.height;
@@ -306,8 +311,8 @@ const Table = (() => {
 
     const wallOpts = { isStatic: true, label: 'wall', restitution: 0.5, friction: 0 };
 
-    // Fixed walls
-    const thickness = 20;
+    // Fixed walls — use 30px thickness so fast ball can't tunnel through
+    const thickness = 30;
     World.add(world, [
       Bodies.rectangle(W / 2, -thickness / 2, W, thickness, wallOpts),           // ceiling
       Bodies.rectangle(-thickness / 2, H / 2, thickness, H, wallOpts),           // left wall
@@ -402,7 +407,8 @@ const Table = (() => {
 
   function spawnBall(world, W, H) {
     const ball = Bodies.circle(W - 45, H * 0.75, 12, {
-      restitution: 0.7, friction: 0.05, density: 0.002, label: 'ball'
+      restitution: 0.6, friction: 0.05, frictionAir: 0.008,
+      density: 0.004, label: 'ball', sleepAllowed: false
     });
     World.add(world, ball);
     tableData.ball = ball;
