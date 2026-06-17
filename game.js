@@ -202,6 +202,7 @@ function transitionTo(state, payload = {}) {
 
     case STATES.PINBALL:
       hideOverlay();
+      Minigames.stop();
       GameState.reset();
       HUD.update();
       Table.generate();
@@ -637,7 +638,435 @@ const Flippers = (() => {
   return { init, activateLeft, releaseLeft, activateRight, releaseRight };
 })();
 
-const Minigames = { start() {}, draw() {} };
+const Minigames = (() => {
+  let active = null;
+
+  // ── Labyrinth ────────────────────────────────────────────────────────────
+  const Labyrinth = (() => {
+    const COLS = 15, ROWS = 20;
+    let maze, playerPos, startTime, swipeStart;
+
+    function generateMaze(cols, rows) {
+      const cells = Array.from({ length: rows }, (_, r) =>
+        Array.from({ length: cols }, (_, c) => ({ r, c, visited: false, walls: [true, true, true, true] }))
+      );
+      const stack = [];
+      const start = cells[0][0];
+      start.visited = true;
+      stack.push(start);
+
+      while (stack.length) {
+        const cur = stack[stack.length - 1];
+        const dirs = [[-1,0,0,2],[0,1,1,3],[1,0,2,0],[0,-1,3,1]];
+        const neighbors = dirs
+          .map(([dr, dc, wall, opp]) => {
+            const nr = cur.r + dr, nc = cur.c + dc;
+            return nr >= 0 && nr < rows && nc >= 0 && nc < cols && !cells[nr][nc].visited
+              ? { cell: cells[nr][nc], wall, opp } : null;
+          })
+          .filter(Boolean);
+
+        if (!neighbors.length) { stack.pop(); continue; }
+        const { cell, wall, opp } = neighbors[Math.floor(Math.random() * neighbors.length)];
+        cur.walls[wall] = false;
+        cell.walls[opp] = false;
+        cell.visited = true;
+        stack.push(cell);
+      }
+      return cells;
+    }
+
+    function start() {
+      maze = generateMaze(COLS, ROWS);
+      playerPos = { r: 0, c: 0 };
+      startTime = Date.now();
+      swipeStart = null;
+
+      document.addEventListener('keydown', onKey);
+    }
+
+    function onKey(e) {
+      if (GameState.current !== STATES.MINIGAME_LABYRINTH) return;
+      const moves = {
+        ArrowUp: [-1, 0, 0], ArrowRight: [0, 1, 1], ArrowDown: [1, 0, 2], ArrowLeft: [0, -1, 3]
+      };
+      const m = moves[e.key];
+      if (!m) return;
+      const [dr, dc, wall] = m;
+      const cell = maze[playerPos.r][playerPos.c];
+      if (!cell.walls[wall]) {
+        playerPos.r += dr;
+        playerPos.c += dc;
+        checkWin();
+      }
+    }
+
+    function onSwipe(e) {
+      if (!swipeStart) { swipeStart = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }; return; }
+      const dx = e.changedTouches[0].clientX - swipeStart.x;
+      const dy = e.changedTouches[0].clientY - swipeStart.y;
+      swipeStart = null;
+      const cell = maze[playerPos.r][playerPos.c];
+      if (Math.abs(dx) > Math.abs(dy)) {
+        if (dx > 20 && !cell.walls[1]) { playerPos.c++; checkWin(); }
+        else if (dx < -20 && !cell.walls[3]) { playerPos.c--; checkWin(); }
+      } else {
+        if (dy > 20 && !cell.walls[2]) { playerPos.r++; checkWin(); }
+        else if (dy < -20 && !cell.walls[0]) { playerPos.r--; checkWin(); }
+      }
+    }
+
+    function checkWin() {
+      if (playerPos.r === ROWS - 1 && playerPos.c === COLS - 1) {
+        document.removeEventListener('keydown', onKey);
+        GameState.addCoins(3);
+        GameState.addScore(500);
+        setTimeout(() => transitionTo(STATES.PINBALL), 500);
+      }
+    }
+
+    function checkTimeout() {
+      if (Date.now() - startTime > 30000) {
+        document.removeEventListener('keydown', onKey);
+        transitionTo(STATES.PINBALL);
+      }
+    }
+
+    function draw(ctx, canvas) {
+      checkTimeout();
+      const W = canvas.width, H = canvas.height - 80;
+      const cellW = W / COLS, cellH = H / ROWS;
+
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = COLORS.cyan;
+      ctx.lineWidth = 1.5;
+      ctx.shadowBlur = 4;
+      ctx.shadowColor = COLORS.cyan;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          const x = c * cellW, y = r * cellH;
+          const cell = maze[r][c];
+          if (cell.walls[0]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + cellW, y); ctx.stroke(); }
+          if (cell.walls[1]) { ctx.beginPath(); ctx.moveTo(x + cellW, y); ctx.lineTo(x + cellW, y + cellH); ctx.stroke(); }
+          if (cell.walls[2]) { ctx.beginPath(); ctx.moveTo(x, y + cellH); ctx.lineTo(x + cellW, y + cellH); ctx.stroke(); }
+          if (cell.walls[3]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y + cellH); ctx.stroke(); }
+        }
+      }
+
+      ctx.shadowBlur = 0;
+
+      // Goal
+      const gx = (COLS - 1) * cellW + cellW / 2, gy = (ROWS - 1) * cellH + cellH / 2;
+      ctx.beginPath(); ctx.arc(gx, gy, cellW * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.portalGreen; ctx.fill();
+
+      // Player
+      const px = playerPos.c * cellW + cellW / 2, py = playerPos.r * cellH + cellH / 2;
+      ctx.beginPath(); ctx.arc(px, py, cellW * 0.3, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.cyan;
+      ctx.shadowBlur = 15; ctx.shadowColor = COLORS.cyan;
+      ctx.fill(); ctx.shadowBlur = 0;
+
+      // Timer bar
+      const elapsed = (Date.now() - startTime) / 30000;
+      ctx.fillStyle = elapsed > 0.8 ? COLORS.orange : COLORS.cyan;
+      ctx.fillRect(0, H, canvas.width * (1 - elapsed), 6);
+    }
+
+    function stop() { document.removeEventListener('keydown', onKey); }
+
+    return { start, draw, onSwipe, stop };
+  })();
+
+  // ── Gravity-Flip ──────────────────────────────────────────────────────────
+  const Gravity = (() => {
+    let ballY, gravDir, checkpoints, passed, startTime, lastFlip, obstacles;
+
+    function start() {
+      ballY = 0.5;
+      gravDir = 1;
+      passed = 0;
+      startTime = Date.now();
+      lastFlip = Date.now();
+      checkpoints = [0.2, 0.35, 0.5, 0.65, 0.8];
+      obstacles = Array.from({ length: 8 }, (_, i) => ({
+        y: 0.12 + i * 0.11,
+        gap: 0.3 + Math.random() * 0.2,
+        gapCenter: 0.2 + Math.random() * 0.6,
+        x: 0
+      }));
+    }
+
+    function flip() {
+      gravDir *= -1;
+      lastFlip = Date.now();
+    }
+
+    function onTap() { flip(); }
+
+    function draw(ctx, canvas) {
+      const W = canvas.width, H = canvas.height;
+      const elapsed = (Date.now() - startTime) / 1000;
+
+      if (elapsed > 20) { transitionTo(STATES.PINBALL); return; }
+
+      // Auto-flip every 3s
+      if (Date.now() - lastFlip > 3000) flip();
+
+      // Move ball
+      ballY += gravDir * 0.003;
+      ballY = Math.max(0.03, Math.min(0.97, ballY));
+
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      const scrollOffset = (elapsed * 0.06) % 1;
+
+      // Obstacles — only check the one nearest to ball's screen Y
+      const ballScreenY = ballY * H;
+      let nearestOb = null, nearestDist = Infinity;
+      obstacles.forEach(ob => {
+        const screenY = ((ob.y - scrollOffset + 1) % 1) * H;
+        const dist = Math.abs(screenY - ballScreenY);
+        if (dist < nearestDist) { nearestDist = dist; nearestOb = { ob, screenY }; }
+      });
+
+      obstacles.forEach(ob => {
+        const screenY = ((ob.y - scrollOffset + 1) % 1) * H;
+        const gapY = ob.gapCenter * H;
+        const gapH = ob.gap * H;
+
+        ctx.fillStyle = 'rgba(255,0,51,0.3)';
+        ctx.strokeStyle = COLORS.portalRed;
+        ctx.lineWidth = 2;
+        ctx.shadowBlur = 8; ctx.shadowColor = COLORS.portalRed;
+
+        // Top block
+        ctx.fillRect(0, screenY - H * 0.05, W, Math.max(0, (gapY - gapH / 2) - (screenY - H * 0.05)));
+        // Bottom block
+        const botY = gapY + gapH / 2;
+        ctx.fillRect(0, botY, W, H - botY);
+        ctx.shadowBlur = 0;
+      });
+
+      // Collision — only nearest obstacle
+      if (nearestOb && nearestDist < H * 0.08) {
+        const { ob } = nearestOb;
+        const gapY = ob.gapCenter * H;
+        const gapH = ob.gap * H;
+        if (ballScreenY < gapY - gapH / 2 || ballScreenY > gapY + gapH / 2) {
+          setTimeout(() => transitionTo(STATES.PINBALL), 0);
+          return;
+        }
+      }
+
+      // Checkpoints
+      checkpoints.forEach((cp, i) => {
+        if (i < passed) return;
+        const cpScreenY = ((cp - scrollOffset + 1) % 1) * H;
+        ctx.strokeStyle = COLORS.portalGreen;
+        ctx.lineWidth = 3;
+        ctx.shadowBlur = 10; ctx.shadowColor = COLORS.portalGreen;
+        ctx.beginPath(); ctx.moveTo(0, cpScreenY); ctx.lineTo(W, cpScreenY); ctx.stroke();
+        ctx.shadowBlur = 0;
+
+        if (Math.abs(ballY - cp) < 0.05) {
+          passed++;
+          if (passed >= 5) {
+            GameState.addEmerald();
+            GameState.addScore(800);
+            setTimeout(() => transitionTo(STATES.PINBALL), 400);
+          }
+        }
+      });
+
+      // Ball
+      const bY = ballY * H;
+      ctx.beginPath(); ctx.arc(W / 2, bY, 14, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.cyan;
+      ctx.shadowBlur = 20; ctx.shadowColor = COLORS.cyan;
+      ctx.fill(); ctx.shadowBlur = 0;
+
+      // Gravity indicator
+      ctx.fillStyle = gravDir > 0 ? COLORS.orange : COLORS.magenta;
+      ctx.font = 'bold 14px Orbitron, monospace';
+      ctx.fillText(gravDir > 0 ? '▼ GRAVITY' : '▲ GRAVITY', 10, 30);
+
+      // Timer
+      ctx.fillStyle = COLORS.cyan;
+      ctx.fillRect(0, H - 6, W * (1 - elapsed / 20), 6);
+    }
+
+    return { start, draw, onTap };
+  })();
+
+  // ── Mirror-Mode ────────────────────────────────────────────────────────────
+  const Mirror = (() => {
+    let bumpers, ball, startTime, bumpersHit;
+    let leftDown = false, rightDown = false;
+
+    function start() {
+      const canvas = document.getElementById('gameCanvas');
+      const W = canvas.width, H = canvas.height;
+      startTime = Date.now();
+      bumpersHit = 0;
+      leftDown = false;
+      rightDown = false;
+
+      bumpers = [
+        { x: W * 0.3, y: H * 0.3, r: 20, hit: false },
+        { x: W * 0.7, y: H * 0.25, r: 20, hit: false },
+        { x: W * 0.5, y: H * 0.45, r: 20, hit: false }
+      ];
+      ball = { x: W / 2, y: H * 0.7, vx: 3, vy: -4 };
+
+      document.addEventListener('keydown', onKey);
+    }
+
+    function onKey(e) {
+      if (GameState.current !== STATES.MINIGAME_MIRROR) return;
+      if (e.key === 'a' || e.key === 'A') rightDown = true; // mirrored
+      if (e.key === 'd' || e.key === 'D') leftDown = true;
+    }
+
+    function draw(ctx, canvas) {
+      const W = canvas.width, H = canvas.height;
+      const elapsed = (Date.now() - startTime) / 1000;
+
+      if (elapsed > 25) { stop(); transitionTo(STATES.PINBALL); return; }
+
+      ctx.fillStyle = COLORS.bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Mirror label
+      ctx.save();
+      ctx.scale(-1, 1);
+      ctx.translate(-W, 0);
+      ctx.fillStyle = COLORS.magenta + '22';
+      ctx.fillRect(0, 0, W, H);
+      ctx.restore();
+
+      ctx.fillStyle = COLORS.magenta;
+      ctx.font = 'bold 14px Orbitron, monospace';
+      ctx.fillText('MIRROR MODE — CONTROLS INVERTED', 10, 30);
+
+      // Walls
+      ctx.strokeStyle = COLORS.cyan;
+      ctx.lineWidth = 3;
+      ctx.shadowBlur = 8; ctx.shadowColor = COLORS.cyan;
+      ctx.strokeRect(10, 50, W - 20, H - 100);
+      ctx.shadowBlur = 0;
+
+      // Flippers (mirrored positions)
+      const fy = H - 70;
+      const flipW = W * 0.22;
+      const leftActive = leftDown, rightActive = rightDown;
+
+      ctx.fillStyle = COLORS.magenta;
+      ctx.shadowBlur = 10; ctx.shadowColor = COLORS.magenta;
+      ctx.fillRect(leftActive ? W * 0.2 : W * 0.18, fy, flipW, 10);
+      ctx.fillRect(rightActive ? W * 0.58 : W * 0.6, fy, flipW, 10);
+      ctx.shadowBlur = 0;
+
+      // Ball physics
+      ball.vy += 0.25;
+      ball.x += ball.vx;
+      ball.y += ball.vy;
+
+      if (ball.x < 20) { ball.x = 20; ball.vx = Math.abs(ball.vx); }
+      if (ball.x > W - 20) { ball.x = W - 20; ball.vx = -Math.abs(ball.vx); }
+      if (ball.y < 60) { ball.y = 60; ball.vy = Math.abs(ball.vy); }
+      if (ball.y > H - 90) {
+        // flipper bounce
+        if ((leftActive && ball.x < W / 2) || (rightActive && ball.x >= W / 2)) {
+          ball.vy = -Math.abs(ball.vy) * 1.1;
+          ball.vx += (leftActive ? -1 : 1) * 2;
+        } else {
+          ball.y = H * 0.7; ball.vx = 3; ball.vy = -4;
+        }
+      }
+
+      // Bumpers
+      bumpers.forEach(b => {
+        if (b.hit) {
+          ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+          ctx.fillStyle = COLORS.portalGreen + '44'; ctx.fill();
+          return;
+        }
+        ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
+        ctx.strokeStyle = COLORS.magenta; ctx.lineWidth = 2;
+        ctx.shadowBlur = 15; ctx.shadowColor = COLORS.magenta;
+        ctx.stroke(); ctx.shadowBlur = 0;
+
+        const dist = Math.hypot(ball.x - b.x, ball.y - b.y);
+        if (dist < b.r + 12) {
+          b.hit = true;
+          bumpersHit++;
+          const angle = Math.atan2(ball.y - b.y, ball.x - b.x);
+          ball.vx = Math.cos(angle) * 8;
+          ball.vy = Math.sin(angle) * 8;
+          if (bumpersHit >= 3) {
+            stop();
+            GameState.addCoins(5);
+            GameState.addScore(600);
+            GameState.mirrorBonusExpiry = Date.now() + 30000;
+            setTimeout(() => transitionTo(STATES.PINBALL), 400);
+          }
+        }
+      });
+
+      // Ball
+      ctx.beginPath(); ctx.arc(ball.x, ball.y, 12, 0, Math.PI * 2);
+      ctx.fillStyle = COLORS.cyan;
+      ctx.shadowBlur = 18; ctx.shadowColor = COLORS.cyan;
+      ctx.fill(); ctx.shadowBlur = 0;
+
+      // Timer
+      ctx.fillStyle = COLORS.magenta;
+      ctx.fillRect(0, H - 6, W * (1 - elapsed / 25), 6);
+    }
+
+    function stop() {
+      document.removeEventListener('keydown', onKey);
+      leftDown = false; rightDown = false;
+    }
+
+    return { start, draw, stop };
+  })();
+
+  // ── Public API ────────────────────────────────────────────────────────────
+  function start(state) {
+    active = state;
+    if (state === STATES.MINIGAME_LABYRINTH) Labyrinth.start();
+    else if (state === STATES.MINIGAME_GRAVITY) Gravity.start();
+    else if (state === STATES.MINIGAME_MIRROR) Mirror.start();
+  }
+
+  function draw(ctx, canvas) {
+    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.draw(ctx, canvas);
+    else if (active === STATES.MINIGAME_GRAVITY) Gravity.draw(ctx, canvas);
+    else if (active === STATES.MINIGAME_MIRROR) Mirror.draw(ctx, canvas);
+  }
+
+  function onTap() {
+    if (active === STATES.MINIGAME_GRAVITY) Gravity.onTap();
+  }
+
+  function onSwipe(e) {
+    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.onSwipe(e);
+  }
+
+  function stop() {
+    if (active === STATES.MINIGAME_LABYRINTH) Labyrinth.stop();
+    if (active === STATES.MINIGAME_MIRROR) Mirror.stop();
+    active = null;
+  }
+
+  return { start, draw, onTap, onSwipe, stop };
+})();
 
 const Controls = (() => {
   let launched = false;
